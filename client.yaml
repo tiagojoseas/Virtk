@@ -1,30 +1,30 @@
 # YAML of Configuration
 vm:
-  name: "server"
+  name: "client"
   username: "user"
   password: "user"
   enable_root_login: true
   root_password: "root"
   number_cores: 4
   memory: "2G"
-  ssh_port: 2020
+  ssh_port: 20039
   rootfs_size_mb: 4096
   # This section defines the network bridges for the VM
   bridges:
     br-ext:
       ip: "172.16.0.1"
       netmask: "255.255.255.0"
-      mac_address: "52:54:00:47:b6:13"
+      mac_address: "52:54:00:47:b6:99"
       external: "wlp0s20f3"
       ssh: true
     br0:
       ip: "10.0.0.1"
       netmask: "255.255.255.0"
-      mac_address: "52:54:00:a4:86:c9"
+      mac_address: "52:54:00:a4:86:59"
     br1:
       ip: "11.0.0.1"
       netmask: "255.255.255.0"
-      mac_address: "52:54:00:4c:7c:6d"
+      mac_address: "52:54:00:4c:7c:60"
   packages:
     - iproute2
     - iputils-ping

@@ -5,11 +5,12 @@
 # =============================================================================
 
 vm_start(){
-    local kernel_version memory cores
+    local kernel_version memory cores 
     kernel_version=$(parse_yaml "$CONFIG_FILE" "kernel.version")
     memory=$(parse_yaml "$CONFIG_FILE" "vm.memory")
     cores=$(parse_yaml "$CONFIG_FILE" "vm.number_cores")
-    
+    local kernel_params="root=/dev/sda rw console=ttyS0 net.ifnames=1 biosdevname=0"
+
     cd "$VM_DIR" || { log_error "Failed to change to VM directory"; return 1; }
     log_info "Starting VM from: $VM_DIR"
     
@@ -42,6 +43,12 @@ vm_start(){
             fi
         fi
     fi
+
+    # Mount folders
+    local mounting
+    mounting="-virtfs local,path="$MAIN_DIR/test_conn",mount_tag=hostshare,security_model=none,id=hostshare"
+
+    kernel_params+=" 9p.virtio=1"
     
     log_info "Starting QEMU VM:"
     log_info "  Memory: $memory"
@@ -51,7 +58,6 @@ vm_start(){
     log_info "  Network: $network_args"
     log_info "  KVM: ${kvm_args:-disabled}"
 
-    read -p "Press Enter to continue..."
     
     # Start VM
     qemu-system-x86_64 \
@@ -60,8 +66,9 @@ vm_start(){
         -smp "$cores" \
         -kernel "linux-$kernel_version/arch/x86/boot/bzImage" \
         -drive file=rootfs.img,format=raw \
-        -append "root=/dev/sda rw console=ttyS0 net.ifnames=1 biosdevname=0" \
+        -append "$kernel_params" \
         -nographic \
+        ${mounting} \
         ${network_args}
 }
 
@@ -89,7 +96,15 @@ _validate_vm_files(){
 }
 
 _get_network_config(){
-    local bridge_names network_args=""
+    local bridge_names network_args="" ssh_port
+
+    ssh_port=$(parse_yaml "$CONFIG_FILE" "vm.ssh_port")
+    
+    # SSH port forwarding
+    if [ -n "$ssh_port" ]; then
+        log_info "SSH Port Forwarding: $ssh_port" >&2
+        network_args+="-net user,hostfwd=tcp::$ssh_port-:22 "
+    fi
     
     # Get bridge configuration
     if ! mapfile -t bridge_names < <(get_yaml_subkeys "$CONFIG_FILE" "vm.bridges"); then

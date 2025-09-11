@@ -27,7 +27,7 @@ for interface in /sys/class/net/enp0s*; do
         if [[ "$iface" == "lo" ]]; then
             continue
         fi
-        
+
         log_message "Processing interface: $iface"
         
         # Bring up the interface

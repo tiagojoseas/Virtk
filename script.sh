@@ -93,8 +93,7 @@ cleanup_mounts() {
 # Always cleanup mounts at the end
 cleanup_mounts
 
-log_success "Operation completed successfully!"
-echo ""
+
 log_info "VM files location: $VM_DIR"
 log_info "To check status: ./script.sh $(basename "$CONFIG_FILE") --status"
 
@@ -169,6 +168,22 @@ kernel_cache_clean(){
 # COMMAND PROCESSING
 # =============================================================================
 
+usage() {
+    echo "Usage: $0 <config.yaml> [OPTION]"
+    echo ""
+    echo "Available options:"
+    echo "  -a |    --all         Complete setup"
+    echo "  -k |    --kernel      Kernel setup only"
+    echo "  -r |    --rootfs      Root filesystem setup only" 
+    echo "  -v |    --vm          Start VM"
+    echo "  -s |    --status      Show system status"
+    echo "  -c |    --clean       Clean VM data"
+    echo ""
+    echo "Network Options:"
+    echo "  -n |    --network     Network setup only"
+    echo "  -t |    --teardown    Remove network"
+}
+
 case "${1:-}" in
     -a|--all)
         log_info "=== COMPLETE VM SETUP ==="
@@ -231,21 +246,8 @@ case "${1:-}" in
         ;;
     
     *)
-        log_error "Unknown option: ${1:-}"
-        echo ""
-        echo "Usage: $0 <config.yaml> [OPTION]"
-        echo ""
-        echo "Available options:"
-        echo "  -a |    --all         Complete setup"
-        echo "  -k |    --kernel      Kernel setup only"
-        echo "  -r |    --rootfs      Root filesystem setup only" 
-        echo "  -v |    --vm          Start VM"
-        echo "  -s |    --status      Show system status"
-        echo "  -c |    --clean       Clean VM data"
-        echo ""
-        echo "Network Options:"
-        echo "  -n |    --network     Network setup only"
-        echo "  -t |    --teardown    Remove network"
-        return 1
+        usage
         ;;
 esac
+
+exit 0

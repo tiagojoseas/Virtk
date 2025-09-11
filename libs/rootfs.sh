@@ -105,7 +105,8 @@ EOF
         return 1
     fi
 
-    # Create network interfaces configuration for manual control
+######## Create network interfaces configuration for manual control ########
+
     log_info "Configuring network interfaces..."
     local rootfs_dir="$VM_DIR/rootfs"
 
@@ -127,6 +128,13 @@ EOF
 
     # Enable the service
     sudo chroot "$rootfs_dir" systemctl enable network-setup.service
+
+
+########################### Into the /etc/hostname ###########################
+    log_info "Setting hostname to: $VM_NAME"
+    sudo tee "$rootfs_dir/etc/hostname" > /dev/null <<EOF
+$VM_NAME
+EOF
 
     # Create filesystem image
     _create_rootfs_image "$rootfs_size_mb"

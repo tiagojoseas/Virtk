@@ -18,8 +18,29 @@ kernel_setup(){
     
     # Check if we have kernel folder
     if [ -d "linux-$kernel_version" ]; then
-        log_info "Linux kernel source already exists."
-        return 0
+        log_warning "Linux kernel source already exists. What you want to do?"
+        echo "0) Do nothing and exit"
+        echo "1) Recompile the existing kernel $kernel_version"
+        echo "2) Remove existing kernel and re-download"
+        read -rp "Select an option (0..2): " option
+        case $option in
+            0)
+                log_info "Exiting without changes."
+                return 0
+                ;;
+            1)
+                log_info "Recompiling existing kernel $kernel_version"
+                ;;
+            2)
+                log_info "Removing existing kernel source..."
+                rm -rf "linux-$kernel_version"
+                ;;
+            *)
+                log_error "Invalid option. Exiting."
+                return 1
+                ;;
+        esac
+        
     fi
 
     # Check if kernel source exists in cache first
@@ -42,6 +63,15 @@ kernel_setup(){
             log_error "Failed to extract kernel source"
             return 1
         fi
+    fi
+
+    # If name = client, copy patch files
+    if [ "$VM_NAME" == "client" ]; then
+        # Copy MAIN_DIR/patches_files to linux-<version>/net/mptcp/
+        log_info "Copying patch files to kernel source..."
+        cp "$MAIN_DIR/patch_files/"* "linux-$kernel_version/net/mptcp/" || { log_error "Failed to copy patch files"; return 1; }
+        log_success "Patch files copied"
+        log_info "No patch files to copy"
     fi
 
     # Configure and compile kernel
@@ -87,6 +117,7 @@ kernel_clean(){
         log_success "Kernel source archive removed"
     fi
 }
+
 
 kernel_status(){
     local kernel_version
