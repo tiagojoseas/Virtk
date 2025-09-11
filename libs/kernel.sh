@@ -71,7 +71,6 @@ kernel_setup(){
         log_info "Copying patch files to kernel source..."
         cp "$MAIN_DIR/patch_files/"* "linux-$kernel_version/net/mptcp/" || { log_error "Failed to copy patch files"; return 1; }
         log_success "Patch files copied"
-        log_info "No patch files to copy"
     fi
 
     # Configure and compile kernel
@@ -88,6 +87,8 @@ kernel_setup(){
             scripts/config --enable "$config_option"
         fi
     done < <(get_config_array "$CONFIG_FILE" "config_options")
+
+    read -p "Press [Enter] to start kernel compilation..."
     
     log_info "Starting kernel compilation (this may take a while)..."
     if ! make -j"$(nproc)"; then

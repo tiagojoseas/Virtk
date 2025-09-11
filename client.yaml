@@ -40,6 +40,8 @@ vm:
     - curl
     - wget
     - ifupdown
+    - make
+    - gcc
 
 kernel:
   version: "6.6.82"
@@ -51,6 +53,18 @@ kernel:
     - CONFIG_E1000
     - CONFIG_VIRTIO_NET
     - CONFIG_NET_SCHED
+    - CONFIG_PRINTK=y
+    - CONFIG_DYNAMIC_DEBUG=y
+    - CONFIG_DEBUG_INFO=y
+    - CONFIG_DEBUG_INFO_DWARF4=y
+    - CONFIG_DEBUG_INFO_BTF=y
+    - CONFIG_DEBUG_INFO_REDUCED=y
+    - CONFIG_DEBUG_INFO_SPLIT=y
+    - CONFIG_KALLSYMS=y
+    - CONFIG_KALLSYMS_ALL=y
+    - CONFIG_MODULES=y
+    - CONFIG_MODULE_UNLOAD=y
+    - CONFIG_MODULE_FORCE_UNLOAD=y
 
 debian:
   arch: "amd64"

@@ -51,12 +51,13 @@ rootfs_setup(){
 }
 
 rootfs_config(){
-    local username password root_password packages rootfs_size_mb
+    local username password root_password packages rootfs_size_mb linux_version
     username=$(parse_yaml "$CONFIG_FILE" "vm.username")
     password=$(parse_yaml "$CONFIG_FILE" "vm.password")
     root_password=$(parse_yaml "$CONFIG_FILE" "vm.root_password")
     rootfs_size_mb=$(parse_yaml "$CONFIG_FILE" "vm.rootfs_size_mb")
-    
+    linux_version=$(parse_yaml "$CONFIG_FILE" "kernel.version")
+
     cd "$VM_DIR" || { log_error "Failed to change to VM directory"; return 1; }
     log_info "Configuring root filesystem..."
     
@@ -79,6 +80,12 @@ set -e
 apt update
 apt upgrade -y
 DEBIAN_FRONTEND=noninteractive apt install -y $packages
+
+# Install kernel headers and module development tools
+# DEBIAN_FRONTEND=noninteractive apt install -y build-essential kmod linux-image-amd64 linux-headers-amd64
+
+# Copy host kernel modules to rootfs for module compilation compatibility
+mkdir -p /lib/modules/$linux_version-generic/
 
 # Configure root password
 echo "root:$root_password" | chpasswd

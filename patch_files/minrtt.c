@@ -22,10 +22,12 @@
 
 static void mptcp_sched_minrtt_init(struct mptcp_sock *msk)
 {
+	pr_info("MinRTT scheduler initialized\n");
 }
 
 static void mptcp_sched_minrtt_release(struct mptcp_sock *msk)
 {
+	pr_info("MinRTT scheduler released\n");
 }
 
 /* Original MinRTT algorithm: select subflow with minimum RTT */
@@ -49,6 +51,7 @@ static int mptcp_sched_minrtt_get_subflow(struct mptcp_sock *msk,
 	}
 	
 	/* No suitable subflow found */
+	pr_info("MinRTT: No suitable subflow found\n");
 	return -EINVAL;
 }
 
