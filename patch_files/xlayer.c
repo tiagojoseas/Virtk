@@ -21,13 +21,6 @@
 #include "common_lib.h"
 #include "xlayer_metrics.h"
 
-static unsigned char dyn_lambda_good __read_mostly = 10;
-module_param(dyn_lambda_good, byte, 0644);
-MODULE_PARM_DESC(dyn_lambda_good, "Decrease of lambda in positive case.");
-
-static unsigned char dyn_lambda_bad __read_mostly = 40;
-module_param(dyn_lambda_bad, byte, 0644);
-MODULE_PARM_DESC(dyn_lambda_bad, "Increase of lambda in negative case.");
 
 /* XLayer global state */
 static struct {

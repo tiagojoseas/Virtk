@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "mptcp_extra.h": "c",
+        "mptcp.h": "c",
+        "cstddef": "c"
+    }
+}
