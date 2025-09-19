@@ -22,7 +22,7 @@ mptcp_scheduler(){
 
 iperf_client(){
 
-    local IP_SERVER="$1"
+    local IP_SERVER="${1:-"10.0.0.229"}"
     local MPTCP_SCHEDULER="${2:-default}"
     
     echo "Starting iperf3 client..."
@@ -81,7 +81,7 @@ if [ "$MODE" = "-c" ]; then
         usage
         exit 1
     fi
-    SERVER_IP="$2"
+    SERVER_IP="${2:-"10.0.0.229"}"
     SCHEDULER="$3"
     iperf_client "$SERVER_IP" "$SCHEDULER"
     exit 0

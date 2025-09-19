@@ -69,7 +69,9 @@ kernel_setup(){
     if [ "$VM_NAME" == "client" ]; then
         # Copy MAIN_DIR/patches_files to linux-<version>/net/mptcp/
         log_info "Copying patch files to kernel source..."
-        cp "$MAIN_DIR/patch_files/"* "linux-$kernel_version/net/mptcp/" || { log_error "Failed to copy patch files"; return 1; }
+        find "$MAIN_DIR/patch_files/" -type f ! -name "mptcp.h" -exec cp {} "linux-$kernel_version/net/mptcp/" \; || { log_error "Failed to copy patch files"; return 1; }
+
+        # cp "$MAIN_DIR/patch_files/mptcp.h" "linux-$kernel_version/include/net/" || { log_error "Failed to copy mptcp.h"; return 1; }
         log_success "Patch files copied"
     fi
 
@@ -88,7 +90,6 @@ kernel_setup(){
         fi
     done < <(get_config_array "$CONFIG_FILE" "config_options")
 
-    read -p "Press [Enter] to start kernel compilation..."
     
     log_info "Starting kernel compilation (this may take a while)..."
     if ! make -j"$(nproc)"; then
