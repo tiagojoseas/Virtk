@@ -65,13 +65,11 @@ kernel_setup(){
         fi
     fi
 
-    # If name = client, copy patch files
+    ## KERNEL PATCHES CONFIGURATION
     if [ "$VM_NAME" == "client" ]; then
         # Copy MAIN_DIR/patches_files to linux-<version>/net/mptcp/
         log_info "Copying patch files to kernel source..."
-        find "$MAIN_DIR/patch_files/" -type f ! -name "mptcp.h" -exec cp {} "linux-$kernel_version/net/mptcp/" \; || { log_error "Failed to copy patch files"; return 1; }
-
-        # cp "$MAIN_DIR/patch_files/mptcp.h" "linux-$kernel_version/include/net/" || { log_error "Failed to copy mptcp.h"; return 1; }
+        cp -r "${MAIN_DIR}/patch_files/scheduler/." "linux-$kernel_version/net/mptcp/"
         log_success "Patch files copied"
     fi
 
