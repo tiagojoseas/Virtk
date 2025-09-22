@@ -69,7 +69,7 @@ kernel_setup(){
     if [ "$VM_NAME" == "client" ]; then
         # Copy MAIN_DIR/patches_files to linux-<version>/net/mptcp/
         log_info "Copying patch files to kernel source..."
-        cp -r "${MAIN_DIR}/patch_files/scheduler/." "linux-$kernel_version/net/mptcp/"
+        cp -r "/home/$USER/xlayer-scheduler/scheduler/." "linux-$kernel_version/net/mptcp/"
         log_success "Patch files copied"
     fi
 

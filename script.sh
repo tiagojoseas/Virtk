@@ -2,8 +2,6 @@
 
 set -e
 
-git clone https://github.com/tiagojoseas/xlayer-scheduler patch_files/
-
 # =============================================================================
 # MAIN SCRIPT - VM MANAGEMENT SYSTEM
 # =============================================================================
