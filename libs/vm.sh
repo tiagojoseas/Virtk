@@ -5,20 +5,51 @@
 # =============================================================================
 
 vm_start(){
-    local kernel_version memory cores 
+    local kernel_version memory cores machine arch kernel_img qemu_bin rootfs_img kernel_params
     kernel_version=$(parse_yaml "$CONFIG_FILE" "kernel.version")
     memory=$(parse_yaml "$CONFIG_FILE" "vm.memory")
     cores=$(parse_yaml "$CONFIG_FILE" "vm.number_cores")
-    local kernel_params="root=/dev/sda rw console=ttyS0 net.ifnames=1 biosdevname=0"
+    machine=$(parse_yaml "$CONFIG_FILE" "kernel.machine")
 
     cd "$VM_DIR" || { log_error "Failed to change to VM directory"; return 1; }
     log_info "Starting VM from: $VM_DIR"
-    
+
+    # Escolhe binário, imagem e params conforme machine
+    if [ -n "$machine" ]; then
+        case "$machine" in
+            "raspberrypi4"|"rpi4"|"raspi4"|"raspberrypi4b"|"rpi4b")
+                arch="arm64"
+                kernel_img="linux-$kernel_version/arch/arm64/boot/Image"
+                qemu_bin="qemu-system-aarch64"
+                rootfs_img="rootfs.img"
+                kernel_params="root=/dev/vda rw console=ttyAMA0"
+                ;;
+            *)
+                arch="x86_64"
+                kernel_img="linux-$kernel_version/arch/x86/boot/bzImage"
+                qemu_bin="qemu-system-x86_64"
+                rootfs_img="rootfs.img"
+                kernel_params="root=/dev/sda rw console=ttyS0 net.ifnames=1 biosdevname=0"
+                ;;
+        esac
+    else
+        arch="x86_64"
+        kernel_img="linux-$kernel_version/arch/x86/boot/bzImage"
+        qemu_bin="qemu-system-x86_64"
+        rootfs_img="rootfs.img"
+        kernel_params="root=/dev/sda rw console=ttyS0 net.ifnames=1 biosdevname=0"
+    fi
+
     # Validate required files
-    if ! _validate_vm_files "$kernel_version"; then
+    if [ ! -f "$kernel_img" ]; then
+        log_error "Kernel image not found: $kernel_img"
         return 1
     fi
-    
+    if [ ! -f "$rootfs_img" ]; then
+        log_error "Root filesystem image not found: $rootfs_img"
+        return 1
+    fi
+
     # Get network configuration
     local network_args
     if ! network_args=$(_get_network_config); then
@@ -27,71 +58,112 @@ vm_start(){
     fi
 
     local kvm_args=""
-    
-    if [ -r /dev/kvm ] && (lsmod | grep -q kvm_intel || lsmod | grep -q kvm_amd || lsmod | grep -q kvm); then
-        kvm_args="-enable-kvm"
-        log_info "KVM acceleration enabled" >&2
-    else
-        log_warning "KVM not available, using software emulation" >&2
-        log_warning "Do you want to activate KVM? (y/n)" >&2
-        read -r answer
-        if [[ "$answer" == "y" ]]; then
-            sudo modprobe kvm
-            sudo modprobe kvm_intel || sudo modprobe kvm_amd
-            if lsmod | grep -q kvm; then
-                kvm_args="-enable-kvm"
+    if [ "$arch" = "x86_64" ]; then
+        if [ -r /dev/kvm ] && (lsmod | grep -q kvm_intel || lsmod | grep -q kvm_amd || lsmod | grep -q kvm); then
+            kvm_args="-enable-kvm"
+            log_info "KVM acceleration enabled" >&2
+        else
+            log_warning "KVM not available, using software emulation" >&2
+            log_warning "Do you want to activate KVM? (y/n)" >&2
+            read -r answer
+            if [[ "$answer" == "y" ]]; then
+                sudo modprobe kvm
+                sudo modprobe kvm_intel || sudo modprobe kvm_amd
+                if lsmod | grep -q kvm; then
+                    kvm_args="-enable-kvm"
+                fi
             fi
         fi
     fi
 
     # Mount folders
     local mounting
-    mounting="-virtfs local,path="$MAIN_DIR/test_conn",mount_tag=hostshare,security_model=none,id=hostshare"
-
+    mounting=(-virtfs local,path=$MAIN_DIR/test_conn,mount_tag=hostshare,security_model=none,id=hostshare)
     kernel_params+=" 9p.virtio=1"
-    
+
     log_info "Starting QEMU VM:"
     log_info "  Memory: $memory"
     log_info "  Cores: $cores"
-    log_info "  Kernel: linux-$kernel_version/arch/x86/boot/bzImage"
-    log_info "  Root FS: rootfs.img"
+    log_info "  Kernel: $kernel_img"
+    log_info "  Root FS: $rootfs_img"
     log_info "  Network: $network_args"
     log_info "  KVM: ${kvm_args:-disabled}"
 
-    
     # Start VM
-    qemu-system-x86_64 \
-        $kvm_args \
-        -m "$memory" \
-        -smp "$cores" \
-        -kernel "linux-$kernel_version/arch/x86/boot/bzImage" \
-        -drive file=rootfs.img,format=raw \
-        -append "$kernel_params" \
-        -nographic \
-        ${mounting} \
-        ${network_args}
+    if [ "$arch" = "arm64" ]; then
+        $qemu_bin \
+            -machine virt \
+            -cpu cortex-a72 \
+            -m "$memory" \
+            -smp "$cores" \
+            -kernel "$kernel_img" \
+            -drive file="$rootfs_img",format=raw,if=none,id=hd0 \
+            -device virtio-blk-device,drive=hd0 \
+            -append "$kernel_params" \
+            -nographic \
+            "${mounting[@]}" \
+            $network_args
+    elif [ "$arch" = "arm" ]; then
+        $qemu_bin \
+            -machine virt \
+            -m "$memory" \
+            -smp "$cores" \
+            -kernel "$kernel_img" \
+            -drive file="$rootfs_img",format=raw,if=virtio \
+            -append "$kernel_params" \
+            -nographic \
+            "${mounting[@]}" \
+            $network_args
+    else
+        $qemu_bin \
+            $kvm_args \
+            -m "$memory" \
+            -smp "$cores" \
+            -kernel "$kernel_img" \
+            -drive file="$rootfs_img",format=raw \
+            -append "$kernel_params" \
+            -nographic \
+            "${mounting[@]}" \
+            $network_args
+    fi
 }
 
 _validate_vm_files(){
     local kernel_version="$1"
-    local valid=true
-    
-    if [ ! -f "linux-$kernel_version/arch/x86/boot/bzImage" ]; then
-        log_error "Kernel image not found: linux-$kernel_version/arch/x86/boot/bzImage"
+    local machine arch kernel_img valid=true
+    machine=$(parse_yaml "$CONFIG_FILE" "kernel.machine")
+    if [ -n "$machine" ]; then
+        case "$machine" in
+            "raspberrypi4"|"rpi4"|"raspi4"|"raspberrypi4b"|"rpi4b")
+                arch="arm64"
+                kernel_img="linux-$kernel_version/arch/arm64/boot/Image"
+                ;;
+            *)
+                arch="x86_64"
+                kernel_img="linux-$kernel_version/arch/x86/boot/bzImage"
+                ;;
+        esac
+    else
+        arch="x86_64"
+        kernel_img="linux-$kernel_version/arch/x86/boot/bzImage"
+    fi
+
+    if [ ! -f "$kernel_img" ]; then
+        log_error "Kernel image not found: $kernel_img"
         log_error "Run: ./script.sh $CONFIG_FILE --kernel"
         valid=false
     fi
-    
+
     if [ ! -f "rootfs.img" ]; then
         log_error "Root filesystem image not found: rootfs.img"
         log_error "Run: ./script.sh $CONFIG_FILE --rootfs"
         valid=false
     fi
-    
+
     if [ "$valid" = false ]; then
         return 1
     fi
-    
+
     return 0
 }
 
@@ -129,21 +201,37 @@ _get_network_config(){
 }
 
 vm_status(){
-    local kernel_version
+    local kernel_version machine arch kernel_img
     kernel_version=$(parse_yaml "$CONFIG_FILE" "kernel.version")
+    machine=$(parse_yaml "$CONFIG_FILE" "kernel.machine")
+    if [ -n "$machine" ]; then
+        case "$machine" in
+            "raspberrypi4"|"rpi4"|"raspi4"|"raspberrypi4b"|"rpi4b")
+                arch="arm64"
+                kernel_img="linux-$kernel_version/arch/arm64/boot/Image"
+                ;;
+            *)
+                arch="x86_64"
+                kernel_img="linux-$kernel_version/arch/x86/boot/bzImage"
+                ;;
+        esac
+    else
+        arch="x86_64"
+        kernel_img="linux-$kernel_version/arch/x86/boot/bzImage"
+    fi
 
     cd "$VM_DIR" || { log_error "Failed to change to VM directory"; return 1; }
 
     log_info "VM Status for $VM_NAME:"
     log_info "  Directory: $VM_DIR"
-    
+
     # Check kernel
-    if [ -f "linux-$kernel_version/arch/x86/boot/bzImage" ]; then
-        log_success "  Kernel: Ready"
+    if [ -f "$kernel_img" ]; then
+        log_success "  Kernel: Ready ($kernel_img)"
     else
-        log_warning "  Kernel: Not built"
+        log_warning "  Kernel: Not built ($kernel_img)"
     fi
-    
+
     # Check rootfs
     if [ -f "rootfs.img" ]; then
         local img_size
@@ -152,9 +240,9 @@ vm_status(){
     else
         log_warning "  Root FS: Not created"
     fi
-    
+
     # Check if VM is ready to start
-    if [ -f "linux-$kernel_version/arch/x86/boot/bzImage" ] && [ -f "rootfs.img" ]; then
+    if [ -f "$kernel_img" ] && [ -f "rootfs.img" ]; then
         log_success "  Status: Ready to start"
         log_info "  Start with: ./script.sh $(basename "$CONFIG_FILE") --vm"
     else

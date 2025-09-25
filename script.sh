@@ -37,7 +37,6 @@ source "${MAIN_DIR}/libs/kernel.sh"
 source "${MAIN_DIR}/libs/rootfs.sh"
 source "${MAIN_DIR}/libs/vm.sh"
 
-# Get VM name and setup directory
 VM_NAME=$(parse_yaml "$CONFIG_FILE" "vm.name" 2>/dev/null || echo "$(basename "$CONFIG_FILE" .yaml)")
 VM_DIR="${MAIN_DIR}/VirtK_Machines/${VM_NAME}"
 mkdir -p "$VM_DIR"
@@ -47,10 +46,15 @@ export CONFIG_FILE
 export VM_NAME
 export VM_DIR
 export MAIN_DIR
+export KERNEL_MACHINE
+KERNEL_MACHINE=$(parse_yaml "$CONFIG_FILE" "kernel.machine")
 
 log_info "VM Management System - $VM_NAME"
 log_info "Config: $CONFIG_FILE"
 log_info "VM Directory: $VM_DIR"
+if [ -n "$KERNEL_MACHINE" ]; then
+    log_info "Kernel machine: $KERNEL_MACHINE"
+fi
 echo ""
 
 

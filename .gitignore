@@ -4,3 +4,5 @@ VirtK_Machines
 RPI-DEV/
 patch_files/
 xlayer_scheduler/
+test_conn/*.json
+

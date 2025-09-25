@@ -15,16 +15,30 @@ rootfs_setup(){
     
     log_info "Using config file: $CONFIG_FILE"
     
-    arch=$(parse_yaml "$CONFIG_FILE" "debian.arch")
     suite=$(parse_yaml "$CONFIG_FILE" "debian.suite") 
     mirror=$(parse_yaml "$CONFIG_FILE" "debian.mirror")
+    machine=$(parse_yaml "$CONFIG_FILE" "kernel.machine")
+
+    # Determina arch automaticamente
+    if [ -n "$machine" ]; then
+        case "$machine" in
+            "raspberrypi4"|"rpi4"|"raspi4"|"raspberrypi4b"|"rpi4b")
+                arch="arm64"
+                ;;
+            *)
+                arch="amd64"
+                ;;
+        esac
+    else
+        arch="amd64"
+    fi
 
     log_info "Parsed values: arch='$arch', suite='$suite', mirror='$mirror'"
-    
+
     # Validate configuration values
     if [ -z "$arch" ] || [ -z "$suite" ] || [ -z "$mirror" ]; then
         log_error "Missing Debian configuration in YAML file"
-        log_error "Required: debian.arch, debian.suite, debian.mirror"
+        log_error "Required: debian.suite, debian.mirror"
         return 1
     fi
 
@@ -74,18 +88,15 @@ rootfs_config(){
         fi
     done < <(get_config_array "$CONFIG_FILE" "packages")
 
+    # Adiciona initramfs-tools para garantir suporte ao boot
+    packages="$packages initramfs-tools"
+
     log_info "Installing packages and configuring system..."
     sudo chroot rootfs /bin/bash <<EOF
 set -e
 apt update
 apt upgrade -y
 DEBIAN_FRONTEND=noninteractive apt install -y $packages
-
-# Install kernel headers and module development tools
-# DEBIAN_FRONTEND=noninteractive apt install -y build-essential kmod linux-image-amd64 linux-headers-amd64
-
-# Copy host kernel modules to rootfs for module compilation compatibility
-mkdir -p /lib/modules/$linux_version-generic/
 
 # Configure root password
 echo "root:$root_password" | chpasswd
@@ -110,6 +121,24 @@ EOF
     if [ $? -ne 0 ]; then
         log_error "Failed to configure root filesystem"
         return 1
+    fi
+
+    # Instala módulos do kernel compilado no rootfs se for Raspberry Pi 4 (arm64)
+    local machine
+    machine=$(parse_yaml "$CONFIG_FILE" "kernel.machine")
+    if [ -n "$machine" ]; then
+        case "$machine" in
+            "raspberrypi4"|"rpi4"|"raspi4"|"raspberrypi4b"|"rpi4b")
+                log_info "Installing kernel modules into rootfs (Raspberry Pi 4 emulation)..."
+                cd "$VM_DIR/linux-$linux_version" || { log_error "Kernel source not found"; return 1; }
+                sudo make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- INSTALL_MOD_PATH="$VM_DIR/rootfs" modules_install || { log_error "Kernel modules install failed"; return 1; }
+                cd "$VM_DIR"
+                # Gera o initramfs para garantir que drivers virtio estão presentes
+                sudo chroot rootfs /bin/bash <<EOF
+update-initramfs -c -k all
+EOF
+                ;;
+        esac
     fi
 
 ######## Create network interfaces configuration for manual control ########
@@ -141,6 +170,12 @@ EOF
     log_info "Setting hostname to: $VM_NAME"
     sudo tee "$rootfs_dir/etc/hostname" > /dev/null <<EOF
 $VM_NAME
+EOF
+
+    # Configurar /etc/fstab para root em /dev/vda
+    log_info "Configuring /etc/fstab for root device..."
+    sudo tee "$rootfs_dir/etc/fstab" > /dev/null <<EOF
+/dev/vda  /  ext4  defaults  0  1
 EOF
 
     # Create filesystem image
