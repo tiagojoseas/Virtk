@@ -92,8 +92,16 @@ apply_patches_if_needed() {
     local kernel_version=$1
     if [ "$VM_NAME" = "client" ]; then
         log_info "A copiar patches..."
-        cp -r "/home/tiago/xlayer-scheduler/scheduler/" "linux-$kernel_version/net/mptcp/" \
+        cp -r "/home/tiago/xlayer-scheduler/scheduler/." "linux-$kernel_version/net/mptcp/" \
             && log_success "Patches aplicados"
+
+        # check if xlayer.c is present
+        if [ -f "linux-$kernel_version/net/mptcp/xlayer.c" ]; then
+            log_success "Patch xlayer.c aplicado com sucesso."
+        else
+            log_error "Falha ao aplicar patch xlayer.c."
+            return 1 
+        fi   
     fi
 }
 
